@@ -1,0 +1,850 @@
+# ============================================================
+# PROJECT: Secure AI-Powered Community Forum
+# ============================================================
+
+You are working on a production-quality community forum application.
+
+Your job is to write secure, maintainable, type-safe, production-ready code.
+
+Never sacrifice security or correctness for speed or brevity.
+
+# ============================================================
+# 1. TECH STACK
+# ============================================================
+
+The project uses:
+
+- Next.js App Router
+- React
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- Supabase PostgreSQL
+- Supabase Auth
+- Supabase Storage when required
+- Groq for AI features
+- Vercel for deployment
+- Zod for runtime validation
+
+Use the existing project stack.
+Do not introduce alternative frameworks or libraries unless there is a clear technical reason.
+
+Do not add Django, Express, another backend framework, or another database unless explicitly requested.
+
+# ============================================================
+# 2. PRODUCT CONTEXT
+# ============================================================
+
+This is a community forum.
+
+Core features include:
+
+- User registration
+- User login
+- User profiles
+- Forum categories
+- Discussion posts
+- Comments
+- Voting
+- Bookmarks
+- Search
+- Notifications
+- AI-assisted moderation
+- AI-generated categorization
+- Similar-post discovery
+- AI-powered discussion summarization
+
+Potential future features may include:
+
+- Semantic search
+- Embeddings
+- pgvector
+- RAG
+- AI community assistant
+
+Do not implement future features unless explicitly requested.
+
+# ============================================================
+# 3. GENERAL ARCHITECTURE
+# ============================================================
+
+Use Next.js App Router.
+
+Prefer React Server Components by default.
+
+Use Client Components only when the component genuinely requires:
+
+- React state
+- React effects
+- browser APIs
+- event handlers
+- client-side interactivity
+
+Keep "use client" components as small as practical.
+
+Keep business logic on the server whenever possible.
+
+Keep database access behind well-defined server-side functions.
+
+Do not put privileged operations in Client Components.
+
+Do not expose secrets to the browser.
+
+Prefer simple architecture over unnecessary abstractions.
+
+Reuse existing utilities and components before creating new ones.
+
+Do not duplicate business logic.
+
+# ============================================================
+# 4. AUTHENTICATION
+# ============================================================
+
+Use Supabase Auth.
+
+Never implement custom password authentication when Supabase Auth can handle it.
+
+Authentication must be verified server-side.
+
+Never trust:
+
+- client-provided user IDs
+- client-provided roles
+- client-provided permissions
+- client-provided admin flags
+- hidden UI elements
+- arbitrary request headers
+
+as proof of authorization.
+
+Never store sensitive authentication tokens or session identifiers in:
+
+- localStorage
+- sessionStorage
+
+Use the official Supabase/Next.js server-side authentication mechanisms.
+
+# ============================================================
+# 5. AUTHORIZATION
+# ============================================================
+
+Authentication and authorization are separate.
+
+Every privileged operation must verify:
+
+1. The user is authenticated.
+2. The user is authorized.
+3. The resource belongs to the user when ownership is required.
+
+UI authorization checks are NOT security boundaries.
+
+For example:
+
+This is NOT sufficient:
+
+    {isAdmin && <DeleteButton />}
+
+The server must independently verify the user's permissions.
+
+Never trust a role supplied by the client.
+
+Roles must come from trusted server-side/database state.
+
+# ============================================================
+# 6. IDOR PROTECTION
+# ============================================================
+
+Prevent Insecure Direct Object References.
+
+Never authorize an operation based solely on a client-provided record ID.
+
+Bad:
+
+    delete post where id = postId
+
+when ownership is required.
+
+Prefer ownership-aware queries and server-side authorization.
+
+For example:
+
+    delete post
+    where id = postId
+    and author_id = authenticatedUserId
+
+Supabase Row Level Security must provide an additional security boundary.
+
+Users must never be able to modify or delete another user's resources simply by changing an ID.
+
+# ============================================================
+# 7. SUPABASE DATABASE SECURITY
+# ============================================================
+
+Every Supabase PostgreSQL table MUST have Row Level Security enabled.
+
+Example:
+
+    ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+
+Define explicit policies for:
+
+- SELECT
+- INSERT
+- UPDATE
+- DELETE
+
+Only define policies for operations that are actually required.
+
+Never create unrestricted mutation policies such as:
+
+    USING (true)
+
+unless there is a documented and justified reason.
+
+For user-owned resources, policies should normally enforce ownership using:
+
+    auth.uid()
+
+Never trust user IDs supplied by the browser.
+
+Database security must not depend exclusively on frontend checks.
+
+# ============================================================
+# 8. SUPABASE SERVICE ROLE KEY
+# ============================================================
+
+SUPABASE_SERVICE_ROLE_KEY bypasses RLS.
+
+Therefore:
+
+- Never expose it to the browser.
+- Never use NEXT_PUBLIC_ with it.
+- Never place it in Client Components.
+- Never return it in an API response.
+- Never commit it to Git.
+
+Only use the service role key in trusted server-side contexts where elevated privileges are genuinely required.
+
+Prefer normal authenticated Supabase access with RLS.
+
+# ============================================================
+# 9. INPUT VALIDATION
+# ============================================================
+
+All untrusted input MUST be validated server-side.
+
+Use Zod for:
+
+- Server Action inputs
+- API request bodies
+- Query parameters
+- Route parameters where appropriate
+- Form submissions
+- Webhook payloads
+- External data when structure is not guaranteed
+
+Example:
+
+    const schema = z.object({
+      title: z.string().min(1).max(200),
+      content: z.string().min(1).max(10000),
+    }).strict();
+
+Do not rely on TypeScript types for runtime validation.
+
+TypeScript types do not exist at runtime.
+
+Reject malformed input.
+
+Reject unexpected fields when appropriate.
+
+Never trust client-side validation alone.
+
+# ============================================================
+# 10. SQL INJECTION
+# ============================================================
+
+Never construct SQL with string concatenation or interpolation.
+
+Never do:
+
+    `SELECT * FROM posts WHERE id = '${id}'`
+
+Use:
+
+- Supabase query builders
+- Parameterized queries
+- Safe database APIs
+
+Never interpolate untrusted input into SQL.
+
+# ============================================================
+# 11. XSS PROTECTION
+# ============================================================
+
+Forum posts and comments are untrusted user-generated content.
+
+Do not use:
+
+    dangerouslySetInnerHTML
+
+unless explicitly required and properly sanitized.
+
+If Markdown or rich text is implemented:
+
+1. Parse it safely.
+2. Sanitize the output.
+3. Use an explicit allowlist.
+4. Disable active content.
+
+Never allow:
+
+- script tags
+- arbitrary event handlers
+- unsafe iframe content
+- executable HTML
+- unsafe URLs
+
+Treat all user-generated content as untrusted.
+
+# ============================================================
+# 12. SERVER ACTIONS AND API ROUTES
+# ============================================================
+
+Prefer Next.js Server Actions for internal application mutations when appropriate.
+
+Use Route Handlers when an actual HTTP endpoint is required, such as:
+
+- Webhooks
+- External integrations
+- Public APIs
+- Streaming endpoints
+- Explicit HTTP interfaces
+
+Every state-changing operation must authenticate and authorize the request.
+
+Never assume an endpoint is secure because it is not linked from the UI.
+
+# ============================================================
+# 13. CSRF
+# ============================================================
+
+For state-changing operations:
+
+- Prefer Server Actions for internal mutations.
+- Use secure authentication cookies.
+- Rely on appropriate SameSite cookie protections.
+- Validate request origin when appropriate for custom HTTP endpoints.
+- Do not treat CORS as CSRF protection.
+- Do not rely solely on Referer headers.
+
+Do not introduce unnecessary custom CSRF complexity.
+
+# ============================================================
+# 14. SSRF
+# ============================================================
+
+If the server fetches a URL supplied by a user:
+
+- Only allow HTTPS unless another protocol is explicitly required.
+- Parse URLs using the standard URL API.
+- Block localhost.
+- Block loopback addresses.
+- Block private network ranges.
+- Block link-local addresses.
+- Block cloud metadata endpoints.
+- Do not blindly proxy arbitrary user URLs.
+
+Examples of blocked targets:
+
+    127.0.0.1
+    localhost
+    10.0.0.0/8
+    172.16.0.0/12
+    192.168.0.0/16
+    169.254.169.254
+
+Only implement URL fetching when the product actually requires it.
+
+# ============================================================
+# 15. SECRETS
+# ============================================================
+
+Never hardcode secrets.
+
+Use .env.local for local development.
+
+Examples:
+
+    NEXT_PUBLIC_SUPABASE_URL=
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=
+    SUPABASE_SERVICE_ROLE_KEY=
+    GROQ_API_KEY=
+
+Only variables explicitly safe for browser exposure may use:
+
+    NEXT_PUBLIC_
+
+Never expose:
+
+- GROQ_API_KEY
+- SUPABASE_SERVICE_ROLE_KEY
+- private database credentials
+- webhook secrets
+- private API keys
+
+Never commit secrets to Git.
+
+Never put real API keys in source code.
+
+# ============================================================
+# 16. GROQ / AI SECURITY
+# ============================================================
+
+Groq API keys MUST remain server-side.
+
+Correct:
+
+    Browser
+      ->
+    Next.js Server
+      ->
+    Groq
+
+Incorrect:
+
+    Browser
+      ->
+    Groq using a private API key
+
+Never expose GROQ_API_KEY to Client Components.
+
+AI output is untrusted data.
+
+Never assume AI-generated content is correct or safe.
+
+Validate structured AI output before:
+
+- storing it
+- using it for business logic
+- using it for moderation
+- using it to modify database state
+
+AI is not a security boundary.
+
+AI must never bypass authentication or authorization.
+
+# ============================================================
+# 17. AI PROMPT INJECTION
+# ============================================================
+
+Forum posts, comments, uploaded documents, retrieved content, and external content are untrusted AI input.
+
+Never treat user-generated content as system instructions.
+
+Clearly separate:
+
+- System instructions
+- Application instructions
+- User content
+- Retrieved content
+
+User content must never be allowed to override application-level instructions.
+
+Never allow arbitrary user content to directly control privileged tools or administrative actions.
+
+# ============================================================
+# 18. ERROR HANDLING
+# ============================================================
+
+Never expose:
+
+- stack traces
+- raw database errors
+- SQL errors
+- internal implementation details
+- API keys
+- environment variables
+- sensitive authentication information
+
+to users.
+
+Return safe messages such as:
+
+    An unexpected error occurred. Please try again.
+
+Log detailed debugging information server-side when appropriate.
+
+Never silently swallow errors.
+
+# ============================================================
+# 19. RATE LIMITING
+# ============================================================
+
+Rate limiting should be implemented for high-abuse operations before production deployment.
+
+Potential targets:
+
+- Login
+- Registration
+- Password reset
+- Post creation
+- Comment creation
+- Voting
+- AI requests
+- Search
+- Public API endpoints
+
+Use an edge-compatible solution such as Upstash Redis when appropriate.
+
+Do not introduce Redis merely for local development unless required.
+
+# ============================================================
+# 20. PAGINATION
+# ============================================================
+
+Never fetch unbounded collections.
+
+All list queries must have a reasonable server-controlled maximum.
+
+Default maximum:
+
+    50 records
+
+Use pagination or cursor-based pagination for:
+
+- Posts
+- Comments
+- Users
+- Notifications
+- Search results
+- Bookmarks
+
+Never allow a client-provided limit to bypass the maximum.
+
+# ============================================================
+# 21. FILE UPLOADS
+# ============================================================
+
+If file uploads are implemented:
+
+- Validate file size.
+- Validate MIME type.
+- Validate extension.
+- Validate file content when appropriate.
+- Use controlled Supabase Storage access.
+- Do not trust browser-provided filenames.
+- Do not trust browser-provided MIME types.
+- Do not allow executable files.
+- Do not allow active HTML/JavaScript uploads.
+
+Default image upload limit:
+
+    5 MB
+
+unless the feature explicitly requires another limit.
+
+# ============================================================
+# 22. TYPESCRIPT
+# ============================================================
+
+Use strict TypeScript.
+
+Never use:
+
+    any
+
+unless there is a documented unavoidable third-party limitation.
+
+Avoid unnecessary type assertions.
+
+Do not use:
+
+    @ts-ignore
+
+to hide real errors.
+
+Do not use:
+
+    as unknown as SomeType
+
+as a shortcut around type safety.
+
+Prefer:
+
+- Explicit types
+- Generated Supabase types
+- Zod schemas
+- Discriminated unions
+- Type-safe utility functions
+
+Fix type errors at their root cause.
+
+# ============================================================
+# 23. SUPABASE TYPES
+# ============================================================
+
+Use generated Supabase TypeScript types where practical.
+
+When the database schema changes:
+
+1. Update the schema/migration.
+2. Regenerate Supabase types.
+3. Fix resulting TypeScript errors.
+4. Verify affected queries.
+
+Do not maintain duplicate database interfaces unnecessarily.
+
+# ============================================================
+# 24. UI / UX
+# ============================================================
+
+Use:
+
+- Tailwind CSS
+- shadcn/ui
+- Reusable components
+- Responsive layouts
+- Accessible HTML
+
+Prefer semantic HTML.
+
+Interactive elements must be keyboard accessible.
+
+Use:
+
+    <button>
+
+for actions.
+
+Use:
+
+    <a>
+
+or Next.js Link for navigation.
+
+Forms should have labels.
+
+Do not sacrifice accessibility for visual appearance.
+
+# ============================================================
+# 25. V0
+# ============================================================
+
+v0 may be used to generate and iterate on UI designs and components.
+
+Do not blindly copy generated v0 code.
+
+Before integrating generated code:
+
+- Check the architecture.
+- Check accessibility.
+- Check TypeScript.
+- Check security.
+- Check responsiveness.
+- Remove unnecessary dependencies.
+- Avoid unnecessary Client Components.
+
+UI generation must not override project security rules.
+
+# ============================================================
+# 26. DEPENDENCIES
+# ============================================================
+
+Before adding a dependency:
+
+1. Check whether Next.js already provides the capability.
+2. Check whether React or the Web Platform provides it.
+3. Check whether an existing dependency already solves it.
+4. Prefer maintained and established libraries.
+5. Avoid dependencies for trivial functionality.
+
+Do not install packages simply because an AI-generated answer used them.
+
+# ============================================================
+# 27. PERFORMANCE
+# ============================================================
+
+Prefer server-side data fetching when appropriate.
+
+Avoid unnecessary client-side fetching.
+
+Avoid unnecessary Client Components.
+
+Use pagination.
+
+Do not load large datasets into the browser.
+
+Use Next.js image optimization where appropriate.
+
+Do not prematurely optimize.
+
+Prioritize correctness and maintainability.
+
+# ============================================================
+# 28. SECURITY HEADERS
+# ============================================================
+
+Production responses should include appropriate security headers such as:
+
+    Content-Security-Policy
+    X-Frame-Options: DENY
+    X-Content-Type-Options: nosniff
+    Referrer-Policy: strict-origin-when-cross-origin
+    Permissions-Policy
+
+CSP must be implemented carefully.
+
+Do not blindly copy a CSP from another project.
+
+Verify required domains for:
+
+- Supabase
+- Vercel
+- fonts
+- images
+- analytics
+- external services
+
+before tightening CSP.
+
+# ============================================================
+# 29. GIT SECURITY
+# ============================================================
+
+Never commit:
+
+    .env
+    .env.local
+    .env.production
+
+or credentials.
+
+Before committing:
+
+- Check .gitignore.
+- Check for exposed secrets.
+- Check for private keys.
+- Check for accidental environment files.
+
+Do not modify unrelated files.
+
+# ============================================================
+# 30. DEVELOPMENT WORKFLOW
+# ============================================================
+
+For every requested feature:
+
+1. Inspect the existing project first.
+2. Understand the current architecture.
+3. Identify affected files.
+4. Identify security implications.
+5. Identify database implications.
+6. If more than two files must change, briefly provide a 2-3 bullet implementation plan before making changes.
+7. Implement the smallest complete solution.
+8. Reuse existing components and utilities.
+9. Run type checking.
+10. Run linting.
+11. Run relevant tests when available.
+12. Fix root causes.
+13. Do not suppress errors.
+14. Do not modify unrelated files.
+15. Summarize what changed.
+
+# ============================================================
+# 31. SURGICAL CHANGES
+# ============================================================
+
+Modify only files relevant to the requested task.
+
+Do not:
+
+- Rewrite the entire project.
+- Refactor unrelated code.
+- Rename unrelated files.
+- Replace working libraries without justification.
+- Delete working functionality.
+- Change the database schema unnecessarily.
+
+If a broader refactor is genuinely required, explain why before doing it.
+
+# ============================================================
+# 32. NO FAKE PRODUCTION IMPLEMENTATIONS
+# ============================================================
+
+Do not create fake implementations that appear production-ready.
+
+Avoid:
+
+- Fake authentication
+- Hardcoded user IDs
+- Fake admin checks
+- Fake AI responses
+- Hardcoded production data
+- Fake database success responses
+- TODO implementations presented as complete
+
+Mock data is acceptable only when explicitly requested for UI development.
+
+When implementing a real feature, connect it to the actual system.
+
+# ============================================================
+# 33. TESTING
+# ============================================================
+
+Before considering a feature complete:
+
+- Run TypeScript checks.
+- Run linting.
+- Run relevant tests.
+- Verify authentication.
+- Verify authorization.
+- Verify invalid input handling.
+- Verify database policies.
+- Verify error handling.
+- Verify secrets are not exposed to client code.
+
+For security-sensitive operations test both:
+
+    Authorized request -> succeeds
+
+and:
+
+    Unauthorized request -> fails
+
+# ============================================================
+# 34. DECISION PRINCIPLE
+# ============================================================
+
+When multiple solutions are technically valid, prefer the solution that is:
+
+1. Secure
+2. Simple
+3. Type-safe
+4. Maintainable
+5. Compatible with the current architecture
+6. Easy to understand
+7. Easy to test
+8. Appropriate for the actual requirement
+
+Do not introduce complexity merely because it is technically possible.
+
+Do not sacrifice security for speed.
+
+Do not sacrifice maintainability for cleverness.
+
+# ============================================================
+# 35. IMPORTANT BEHAVIOR
+# ============================================================
+
+Before writing code, understand the user's requested outcome.
+
+Do not over-engineer simple features.
+
+Do not implement future features unless requested.
+
+Do not change unrelated parts of the project.
+
+When uncertain about a destructive or architectural decision, ask before proceeding.
+
+Always preserve existing working functionality unless the requested task explicitly requires changing it.
